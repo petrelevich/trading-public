@@ -1,5 +1,6 @@
 package ru.datafeed.rest;
 
+import com.linecorp.armeria.common.Flags;
 import com.linecorp.armeria.common.HttpResponse;
 import com.linecorp.armeria.server.Server;
 import com.linecorp.armeria.server.ServerBuilder;
@@ -19,6 +20,8 @@ import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.core.instrument.binder.system.UptimeMetrics;
 import io.micrometer.prometheus.PrometheusConfig;
 import io.micrometer.prometheus.PrometheusMeterRegistry;
+import io.netty.channel.EventLoopGroup;
+import java.util.concurrent.ThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,11 +32,11 @@ public class WebServer {
     private final JvmGcMetrics jvmGcMetrics;
     private final JvmHeapPressureMetrics jvmHeapPressureMetrics;
 
-    public WebServer(int port, BondsRest bondsRest) {
+    public WebServer(int port, int threadNumber, BondsRest bondsRest) {
         jvmGcMetrics = new JvmGcMetrics();
         jvmHeapPressureMetrics = new JvmHeapPressureMetrics();
         this.bondsRest = bondsRest;
-        server = newServer(port);
+        server = newServer(port, threadNumber);
         server.start().join();
         log.info("Server has been started. Serving DocService at http://127.0.0.1:{}/docs", server.activeLocalPort());
     }
@@ -45,12 +48,13 @@ public class WebServer {
         log.info("webServer closed");
     }
 
-    private Server newServer(int port) {
+    private Server newServer(int port, int threadNumber) {
         var prometheusMeterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
         initMetrics(prometheusMeterRegistry);
 
         var sb = Server.builder();
         sb.http(port)
+                .workerGroup(makeEventLoopGroup(threadNumber), true)
                 .requestTimeoutMillis(20_000)
                 .decorator(LoggingService.newDecorator())
                 .service("/health", HealthCheckService.builder().build())
@@ -82,5 +86,12 @@ public class WebServer {
         new JvmThreadMetrics().bindTo(prometheusMeterRegistry);
         new ProcessorMetrics().bindTo(prometheusMeterRegistry);
         new UptimeMetrics().bindTo(prometheusMeterRegistry);
+    }
+
+    private EventLoopGroup makeEventLoopGroup(int nThreads) {
+        ThreadFactory threadFactory =
+                task -> Thread.ofVirtual().name("armeria-loop-", 0).unstarted(task);
+        var type = Flags.transportType();
+        return type.newEventLoopGroup(nThreads, unused -> threadFactory);
     }
 }

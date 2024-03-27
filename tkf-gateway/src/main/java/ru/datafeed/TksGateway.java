@@ -2,10 +2,18 @@ package ru.datafeed;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.linecorp.armeria.client.ClientFactory;
 import com.linecorp.armeria.client.grpc.GrpcClients;
-
+import com.linecorp.armeria.common.Flags;
+import com.linecorp.armeria.common.RequestContext;
+import com.linecorp.armeria.common.annotation.Nullable;
+import com.linecorp.armeria.common.grpc.GrpcExceptionHandlerFunction;
+import io.grpc.Metadata;
+import io.grpc.Status;
+import io.netty.channel.EventLoopGroup;
 import java.util.Objects;
-
+import java.util.concurrent.ThreadFactory;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.datafeed.bonds.BondsService;
@@ -29,16 +37,19 @@ public class TksGateway {
         var token = Objects.requireNonNull(System.getenv("TKF_SENDBOX"), "env TOKEN is null");
         var url = Objects.requireNonNull(System.getenv("URL"), "env URL is null");
         var port = Integer.parseInt(Objects.requireNonNull(System.getenv("PORT"), "env PORT is null"));
-
-        log.info("url:{}, port:{}", url, port);
+        var webThreads =
+                Integer.parseInt(Objects.requireNonNull(System.getenv("WEB_THREADS"), "env WEB_THREADS is null"));
+        var grpcThreads =
+                Integer.parseInt(Objects.requireNonNull(System.getenv("GRPC_THREADS"), "env GRPC_THREADS is null"));
+        log.info("url:{}, port:{}, webThreads:{}, grpcThreads:{}", url, port, webThreads, grpcThreads);
 
         var jsonMapper = JsonMapper.builder().build();
         jsonMapper.registerModule(new JavaTimeModule());
 
-        var instrumentsService = instrumentsServiceStub(url, token);
+        var instrumentsService = instrumentsServiceStub(url, token, grpcThreads);
         var bondsService = bondsService(instrumentsService);
         var bondsRest = new BondsRest(jsonMapper, bondsService);
-        var webServer = webServer(port, bondsRest);
+        var webServer = webServer(port, webThreads, bondsRest);
 
         var shutdownHook = new Thread(() -> {
             log.info("closing Application");
@@ -48,8 +59,22 @@ public class TksGateway {
         Runtime.getRuntime().addShutdownHook(shutdownHook);
     }
 
-    private InstrumentsServiceGrpc.InstrumentsServiceStub instrumentsServiceStub(String url, String token) {
+    private InstrumentsServiceGrpc.InstrumentsServiceStub instrumentsServiceStub(
+            String url, String token, int grpcThreads) {
+        var factory = ClientFactory.builder()
+                .workerGroup(makeEventLoopGroup(grpcThreads), true)
+                .build();
+
         return GrpcClients.builder(String.format("gproto+https://%s", url))
+                .factory(factory)
+                .exceptionHandler(new GrpcExceptionHandlerFunction() {
+                    @Override
+                    public @Nullable Status apply(
+                            @Nonnull RequestContext ctx, @Nonnull Throwable cause, @Nonnull Metadata metadata) {
+                        log.error("error. meta:{}", metadata, cause);
+                        return Status.ABORTED;
+                    }
+                })
                 .decorator((delegate, ctx, req) -> {
                     ctx.addAdditionalRequestHeader("Authorization", String.format("Bearer %s", token));
                     return delegate.execute(ctx, req);
@@ -57,11 +82,18 @@ public class TksGateway {
                 .build(InstrumentsServiceGrpc.InstrumentsServiceStub.class);
     }
 
-    private WebServer webServer(int port, BondsRest bondsRest) {
-        return new WebServer(port, bondsRest);
+    private WebServer webServer(int port, int threadNumber, BondsRest bondsRest) {
+        return new WebServer(port, threadNumber, bondsRest);
     }
 
     private BondsService bondsService(InstrumentsServiceGrpc.InstrumentsServiceStub instrumentsService) {
         return new BondsServiceGrpc(instrumentsService);
+    }
+
+    private EventLoopGroup makeEventLoopGroup(int nThreads) {
+        ThreadFactory threadFactory =
+                task -> Thread.ofVirtual().name("armeria-grpc-loop-", 0).unstarted(task);
+        var type = Flags.transportType();
+        return type.newEventLoopGroup(nThreads, unused -> threadFactory);
     }
 }
