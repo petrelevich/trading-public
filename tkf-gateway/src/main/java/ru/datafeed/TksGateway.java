@@ -1,5 +1,6 @@
 package ru.datafeed;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.linecorp.armeria.client.ClientFactory;
@@ -43,12 +44,11 @@ public class TksGateway {
                 Integer.parseInt(Objects.requireNonNull(System.getenv("GRPC_THREADS"), "env GRPC_THREADS is null"));
         log.info("url:{}, port:{}, webThreads:{}, grpcThreads:{}", url, port, webThreads, grpcThreads);
 
-        var jsonMapper = JsonMapper.builder().build();
-        jsonMapper.registerModule(new JavaTimeModule());
+        var jsonMapper = objectMapper();
 
         var instrumentsService = instrumentsServiceStub(url, token, grpcThreads);
         var bondsService = bondsService(instrumentsService);
-        var bondsRest = new BondsRest(jsonMapper, bondsService);
+        var bondsRest = bondsRest(jsonMapper, bondsService);
         var webServer = webServer(port, webThreads, bondsRest);
 
         var shutdownHook = new Thread(() -> {
@@ -57,6 +57,16 @@ public class TksGateway {
             bondsService.close();
         });
         Runtime.getRuntime().addShutdownHook(shutdownHook);
+    }
+
+    private ObjectMapper objectMapper() {
+        var jsonMapper = JsonMapper.builder().build();
+        jsonMapper.registerModule(new JavaTimeModule());
+        return jsonMapper;
+    }
+
+    private BondsRest bondsRest(ObjectMapper jsonMapper, BondsService bondsService) {
+        return new BondsRest(jsonMapper, bondsService);
     }
 
     private InstrumentsServiceGrpc.InstrumentsServiceStub instrumentsServiceStub(
