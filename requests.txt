@@ -1,0 +1,1 @@
+curl -X PUT -H 'content-type: application/json; charset=utf-8' http://localhost:8080/bonds/load

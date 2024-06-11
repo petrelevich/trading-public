@@ -1,13 +1,13 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="TksGateway" type="Application" factoryName="Application" nameIsGenerated="true">
+  <configuration default="false" name="BondsReference" type="Application" factoryName="Application">
     <envs>
       <env name="PORT" value="8080" />
       <env name="WEB_THREADS" value="1" />
       <env name="URL" value="sandbox-invest-public-api.tinkoff.ru:443" />
       <env name="GRPC_THREADS" value="1" />
     </envs>
-    <option name="MAIN_CLASS_NAME" value="ru.datafeed.TksGateway" />
-    <module name="trading-public.tkf-gateway.main" />
+    <option name="MAIN_CLASS_NAME" value="ru.datafeed.BondsReference" />
+    <module name="trading-public.bonds-reference.main" />
     <extension name="coverage">
       <pattern>
         <option name="PATTERN" value="ru.datafeed.*" />

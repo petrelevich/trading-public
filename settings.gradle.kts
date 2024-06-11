@@ -1,6 +1,6 @@
 rootProject.name = "trading-public"
 
-include("tkf-gateway")
+include("bonds-reference")
 include("tkf-contract")
 
 

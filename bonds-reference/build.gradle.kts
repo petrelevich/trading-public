@@ -5,13 +5,19 @@ plugins {
 
 dependencies {
     implementation(project(":tkf-contract"))
+    implementation("org.springframework.boot:spring-boot-starter")
+
     implementation("com.linecorp.armeria:armeria-grpc")
     implementation("ch.qos.logback:logback-classic")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
-    implementation ("io.micrometer:micrometer-registry-prometheus")
+    implementation("io.micrometer:micrometer-registry-prometheus")
 
-    compileOnly ("org.projectlombok:lombok")
-    annotationProcessor ("org.projectlombok:lombok")
+    implementation("org.flywaydb:flyway-core")
+    implementation("com.zaxxer:HikariCP")
+    implementation("org.postgresql:postgresql")
+
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
 }
 
 
@@ -29,8 +35,8 @@ jib {
     }
 }
 
-//tasks {
-//    build {
-//        dependsOn(jibBuildTar)
-//    }
-//}
+tasks {
+    build {
+        dependsOn(jibBuildTar)
+    }
+}

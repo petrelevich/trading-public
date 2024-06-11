@@ -1,6 +1,6 @@
 package ru.datafeed.bonds;
 
-public interface BondsService {
+public interface BondsInfoSourceService {
 
     void getBonds(BondsConsumer bondsConsumers);
 

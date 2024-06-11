@@ -1,0 +1,12 @@
+tkf:
+  url: "sandbox-invest-public-api.tinkoff.ru:443"
+  thread-no: 1
+
+webserver:
+  port: 8080
+  thread-no: 1
+
+data-source:
+  url: "jdbc:postgresql://localhost:5430/bondsDB"
+  user: "usr"
+  pwd: "pwd"

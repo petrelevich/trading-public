@@ -61,6 +61,7 @@ allprojects {
             force("com.google.code.findbugs:jsr305:3.0.2")
             force("org.eclipse.platform:org.eclipse.osgi:3.18.300")
             force("org.eclipse.platform:org.eclipse.equinox.common:3.17.100")
+            force("org.checkerframework:checker-qual:3.33.0")
         }
     }
 }
